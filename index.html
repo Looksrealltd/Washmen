@@ -86,14 +86,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .img-section{background:var(--paper);border:2px dashed var(--rule);border-radius:12px;overflow:hidden;transition:border-color .2s}
 .img-section:hover{border-color:rgba(26,24,21,.28)}
 .img-section.has-img{border-style:solid;border-color:var(--rule)}
-.img-placeholder{padding:2rem 1.25rem;text-align:center;cursor:pointer}
+.img-placeholder{
+  padding:2rem 1.25rem;
+  text-align:center;
+  cursor:pointer;
+  min-height:320px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
 .img-placeholder-icon{width:42px;height:42px;background:var(--warm);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:17px;color:var(--ink)}
 .img-placeholder-title{font-size:13px;font-weight:500;margin-bottom:4px}
 .img-placeholder-sub{font-size:11px;color:rgba(26,24,21,.43);line-height:1.55}
 .img-placeholder-btn{margin-top:12px;display:inline-block;background:var(--ink);color:var(--cream);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:8px 16px;border-radius:6px;cursor:pointer}
 .img-preview-wrap{display:none;flex-direction:column}
 .img-preview-wrap.visible{display:flex}
-.img-preview{width:100%;max-height:300px;object-fit:cover;display:block}
+.img-preview{width:100%;aspect-ratio:9/16;object-fit:cover;display:block}
 .img-toolbar{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:var(--paper);border-top:1px solid var(--rule);gap:7px}
 .img-filename{font-family:'DM Mono',monospace;font-size:10px;color:rgba(26,24,21,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .img-action-btn{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:6px 11px;border-radius:6px;cursor:pointer;transition:all .15s;border:none;white-space:nowrap;flex-shrink:0}
@@ -155,7 +164,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <main class="slide-area" id="slide-area"></main>
 </div>
 
-<button class="export-fab" onclick="exportCalendar()">
+<button
+  class="export-fab"
+  style="right:220px;background:#1a7a55;"
+  onclick="persistImages()"
+>
+  <span style="font-size:13px">💾</span>
+  <span>Save Images</span>
+</button>
+
+
   <span class="export-fab-dot" id="export-dot"></span>
   <span id="export-label">Export Calendar</span>
 </button>
@@ -318,18 +336,103 @@ function filterWeek(w,btn){
 function handleImageUpload(idx,input){
   const file=input.files[0];
   if(!file)return;
+
   const reader=new FileReader();
+
   reader.onload=e=>{
-    imageStore[idx]={dataUrl:e.target.result,filename:file.name,origFile:file};
+    imageStore[idx]={
+      dataUrl:e.target.result,
+      filename:file.name
+    };
+
+    persistImages();
+
     renderSlides();
     updateHeader();
     updateExportDot();
   };
+
   reader.readAsDataURL(file);
+}
+
+function persistImages(){
+  try{
+    const payload={};
+
+    Object.keys(imageStore).forEach(k=>{
+      payload[k]={
+        dataUrl:imageStore[k].dataUrl,
+        filename:imageStore[k].filename
+      };
+    });
+
+    localStorage.setItem(
+      'washmen_images',
+      JSON.stringify(payload)
+    );
+
+    showSaveConfirm();
+
+  }catch(e){
+
+    alert(
+      'Storage full — images are too large to save locally. Use the Download button instead.'
+    );
+
+  }
+}
+
+function loadFromStorage(){
+
+  try{
+
+    const raw=localStorage.getItem('washmen_images');
+
+    if(!raw)return;
+
+    const payload=JSON.parse(raw);
+
+    Object.keys(payload).forEach(k=>{
+      imageStore[Number(k)]=payload[k];
+    });
+
+  }catch(e){}
+
+}
+
+function showSaveConfirm(){
+
+  let toast=document.getElementById('save-toast');
+
+  if(!toast){
+
+    toast=document.createElement('div');
+
+    toast.id='save-toast';
+
+    toast.style.cssText=
+      'position:fixed;bottom:80px;right:24px;background:#1a7a55;color:#fff;font-family:DM Mono,monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:10px 16px;border-radius:8px;z-index:300;transition:opacity .4s;pointer-events:none';
+
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent='✓ Images saved to this browser';
+
+  toast.style.opacity='1';
+
+  clearTimeout(toast._t);
+
+  toast._t=setTimeout(
+    ()=>toast.style.opacity='0',
+    2500
+  );
 }
 
 function removeImage(idx){
   delete imageStore[idx];
+
+  persistImages();
+
   renderSlides();
   updateHeader();
   updateExportDot();
@@ -375,6 +478,8 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight')navigate(1);
   if(e.key==='ArrowLeft')navigate(-1);
 });
+
+loadFromStorage();
 
 renderSlides();
 updateHeader();
